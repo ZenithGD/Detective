@@ -1,5 +1,5 @@
 {
     "calibration": "./resources/calibration",
     "photos": "./resources/photos",
-    "target": "./resources/old_photo.png"
+    "target": "./resources/target.jpg"
 }
