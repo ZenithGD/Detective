@@ -86,6 +86,9 @@ class CalibrationStage(Stage):
         context.input_calib = mtx
         context.input_dist = dist
 
+        np.savetxt("K_c.txt", context.input_calib)
+        np.savetxt("dist.txt", context.input_dist)
+
         return cal_input_images
 
 
@@ -93,6 +96,9 @@ class CalibrationStage(Stage):
         cal_images, input_images, target_image = input
 
         cal_input_images = self.__calibrate(cal_images, input_images, context)
+
+        self.images = cal_input_images
+        self.target = target_image
 
         if super().has_callback():
             super().get_callback()(cal_input_images)

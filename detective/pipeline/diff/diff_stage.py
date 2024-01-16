@@ -17,9 +17,6 @@ class DiffStage(Stage):
         return f"DiffStage : (3d, pose) -> (3d, pose, diffs)"
 
     def run(self, input: _SFMInput, context : Pipeline) -> _SFMOutput:
-        matches = input
+        points3d, pose = input
 
-        print(context.input_calib)
-        print(context.input_dist)
-
-        return np.zeros((4, 10)), np.eye(4)
+        return points3d, pose, np.zeros((10, 10))

@@ -34,12 +34,24 @@ def create_F_eq(p0, p1):
 
     return np.array([m0, m1, m2, m3, m4, m5, m6, m7, m8])
     
-def create_F(matches1, matches2):
-    eq = np.concatenate(
+def create_F_from_matches(matches1 : np.array, matches2 : np.array):
+    """Create fundamental matrix from a set of matches.
+
+    Args:
+        matches1 (np.array): Points in first image space
+        matches2 (np.array): Points in second image space
+    """
+    F_eq = np.concatenate(
         [ create_F_eq(matches1[i], matches2[i]).reshape(1, 9) for i in range(matches1.shape[0]) ],
         axis = 0)
     
-    return eq
+    U, S, V = np.linalg.svd(F_eq)
+    F = V[-1].reshape(3,3)
+    U, S, V = np.linalg.svd(F)
+    return U @ np.diag(np.array([S[0], S[1], 0])) @ V
+
+def DLT_projection(matches1, matches2):
+    pass
 
 def create_tri_eq(P, point2d):
     mat00 = P[2][0] * point2d[0] - P[0][0]
@@ -91,4 +103,3 @@ def create_F_GT(T, K0, K1):
 
 def essential_from_F(F, K0, K1):
     return K0.T @ F @ K1
-

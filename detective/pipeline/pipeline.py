@@ -34,8 +34,16 @@ class Pipeline:
         self.__stages : List[Stage] = stages
 
         # context
+
+        # image calibration matrix
         self.input_calib = None
+
+        # distortion coefficient parameters
         self.input_dist = None
+        
+        self.images = None
+        self.target = None
+        self.selection = None
 
     def __repr__(self) -> str:
 

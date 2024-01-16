@@ -1,6 +1,5 @@
 from detective.utils.spatial import *
 
-
 def triangulate(x1, x2, P_c1, P_c2):
     points3d = []
     for i in range(x1.shape[0]):
@@ -17,7 +16,19 @@ def triangulate(x1, x2, P_c1, P_c2):
     return np.array(points3d)
 
 
-def pointsInFront(points3d, R, t):
+def pointsInFront(x1, x2, R, t, K1, K2):
+    Icanon = np.array([
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0]
+    ])
+
+    t2D = t.reshape(t.shape[0], 1)
+
+    P1 = K1 @ Icanon
+    P2 = K2 @ np.concatenate([R, t2D], axis=1)
+
+    points3d = triangulate(x1, x2, P1, P2)
 
     infront = 0
 
@@ -33,9 +44,9 @@ def pointsInFront(points3d, R, t):
         if pointFrame2[2] > 0:
             infront += 1
 
-    return infront
+    return points3d, infront
 
-def getPose(points3d, E : np.array):
+def getAllPossibleT(x1, x2, K1, K2, E : np.array):
     U, S, V = np.linalg.svd(E)
     t = U[:, 2] 
 
@@ -56,7 +67,34 @@ def getPose(points3d, E : np.array):
 
     # 4 solutions
     sols = [ (R_p90_t, t), (R_p90_t, -t), (R_n90_t, t), (R_n90_t, -t) ]
-    points_in_front = [ pointsInFront(points3d, R, t) for (R, t) in sols ]
 
-    R, t = sols[np.argmax(points_in_front)]
-    return R, t
+    return [create_T(R, t) for R, t in sols]
+
+def getPose(x1, x2, K1, K2, E : np.array):
+    U, S, V = np.linalg.svd(E)
+    t = U[:, 2] 
+
+    W = np.array([
+        [0, -1, 0],
+        [1,  0, 0],
+        [0,  0, 1]
+    ])
+
+    uwvt = U @ W @ V
+    uwvtn = -U @ W @ V
+
+    R_p90_t = uwvt if np.linalg.det(uwvt) > 0 else uwvtn
+
+    uwtvt = U @ W.T @ V
+    uwtvtn = -U @ W.T @ V
+    R_n90_t = uwtvt if np.linalg.det(uwtvt) > 0 else uwtvtn
+
+    # 4 solutions
+    sols = [ (R_p90_t, t), (R_p90_t, -t), (R_n90_t, t), (R_n90_t, -t) ]
+    points3d_all, points_in_front = list(zip(*[ pointsInFront(x1, x2, R, t, K1, K2) for (R, t) in sols ]))
+
+    bidx = np.argmax(points_in_front)
+    R, t = sols[bidx]
+    points3d = points3d_all[bidx]
+    
+    return points3d, create_T(R, t)

@@ -1,5 +1,7 @@
 {
     "calibration": "./resources/calibration",
     "photos": "./resources/photos",
-    "target": "./resources/target.jpg"
+    "target": "./resources/target.jpg",
+    "match_threshold": 50,
+    "common_threshold": 60
 }
