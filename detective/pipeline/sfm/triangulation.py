@@ -1,4 +1,9 @@
+from detective.utils.plot import *
 from detective.utils.spatial import *
+import scipy as sc
+import scipy.optimize as scOptim
+
+from itertools import chain
 
 def triangulate(x1, x2, P_c1, P_c2):
     points3d = []
@@ -16,7 +21,7 @@ def triangulate(x1, x2, P_c1, P_c2):
     return np.array(points3d)
 
 
-def pointsInFront(x1, x2, R, t, K1, K2):
+def pointsInFront(x1, x2, R, t, K1, K2): 
     Icanon = np.array([
         [1, 0, 0, 0],
         [0, 1, 0, 0],
@@ -98,3 +103,103 @@ def getPose(x1, x2, K1, K2, E : np.array):
     points3d = points3d_all[bidx]
     
     return points3d, create_T(R, t)
+
+def resBundleProjection(Op, data, K_c, nPoints, nCams):
+    """
+    -input:
+        Op: Optimization parameters: this must include a
+        paramtrization for T_i1 (reference 1 seen from reference i) list [X3D1, X3D2, ..., X3DnPoints,tx1, ty1, tz1, theta_x1, theta_y1, theta_z1, ...]
+        in a proper way and for X1 (3D points in ref 1)
+        data: list((2xnPoints)) list of 2D points on image i (w/o homogeneous
+        coordinates)
+        K_c: (3x3) Intrinsic calibration matrix for all cameras
+        nPoints: Number of points 
+        nCams: Number of cameras (including camera 1)
+    -output: 
+        res: residuals from the error between the 2D matched points and the 
+        projected points from the 3D points (2 equations/residuals per 2D point) 
+    """
+
+    points3d = np.array(Op[0:3 * nPoints])
+    opt_params = np.array(Op[3 * nPoints:])
+
+    projs = []
+    res = []
+    params = [np.eye(4)]
+
+    X1_3d = np.concatenate([points3d.reshape(3, nPoints), np.ones((1, nPoints))])
+    for i in range(0, nCams - 1):
+        # 6 parameters per camera
+        params_i = opt_params[6 * i: 6 * (i + 1)]
+        t = params_i[:3]
+        R = sc.linalg.expm(crossMatrix(params_i[3:]))
+
+        Ti1 = create_T(R, t)
+        params.append(Ti1)
+
+    for i in range(nCams):
+        Pi = create_P(K_c, params[i])
+        xi_proj = Pi @ X1_3d
+        xi_proj /= xi_proj[2]
+
+        projs.append(xi_proj[:2])
+
+        res_i = xi_proj[:2].flatten() - data[i].flatten()
+        res.append(res_i)
+
+    return np.concatenate(res)
+
+def BA_optimize(points3d, poses, keypoints, K_c):
+    """Optimize points in 3d and poses with multiview BA.
+
+    Args:
+        points3d (np.array): _description_
+        poses (list): _description_
+        keypoints (list): _description_
+    """
+
+    vec3d = points3d[:3].flatten()
+
+    print(vec3d.shape)
+    for k in keypoints:
+        print(k.shape)
+    pose_tup = [ pose_from_T(np.linalg.inv(pose)) for pose in poses ]
+    pose_list = []
+    for R, t in pose_tup:
+        pose_list.append(crossMatrixInv(sc.linalg.logm(R)))
+        pose_list.append(t)
+
+    # first solution [X3D1, X3D2, ..., X3DnPoints,tx, ty, tz, theta_x, theta_y, theta_z]
+    Op = np.concatenate([ vec3d ] + pose_list).astype(float)
+    print()
+    npoints = points3d.shape[1]
+    ncams = len(poses)
+
+    print(f"Multiview BA ({ncams} views) for {npoints} points")
+
+    # Optimization with L2 norm and Levenberg-Marquardt
+    OpOptim = scOptim.least_squares(
+        resBundleProjection, Op, 
+        args=([ kp.T for kp in keypoints ], K_c, npoints, ncams), 
+        method='trf', jac='3-point', loss='huber',
+        verbose=2)
+
+    print("Plotting 3d BA-refined reconstruction")
+
+    p3d_ba = np.concatenate([OpOptim.x[: 3 * npoints].reshape(3, -1), np.ones((1, npoints))])
+    transf = [ np.eye(4) ]
+    ba_params = OpOptim.x[3 * npoints:]
+    for i in range(ncams - 1):
+        ba_params_i = ba_params[6 * i: 6 * (i + 1)]
+        t_ba = ba_params_i[:3].reshape(1, 3)
+        th_ba = ba_params_i[3:]
+        R_ba = sc.linalg.expm(crossMatrix(th_ba))
+        transf.append(create_T(R_ba, t_ba))
+
+    ax_ba = plot_3dpoints(
+        refs=transf, 
+        points=[points3d, p3d_ba.T],
+        ref_labels=[ f"C{i}" for i in range(len(poses))],
+        point_labels=["Ground truth", "Initial triangulation", "BA optimized"])
+    
+    return transf, points3d

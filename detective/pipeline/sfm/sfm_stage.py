@@ -7,6 +7,7 @@ from detective.pipeline import Pipeline, Stage
 from detective.utils.spatial import *
 
 from .triangulation import *
+from detective.utils.plot import *
 
 _ImageList : TypeAlias = List[np.array]
 _SFMInput : TypeAlias = Tuple[np.array, _ImageList, np.array]
@@ -30,7 +31,7 @@ class SFMStage(Stage):
             keypoints (np.array): _description_
         """
         K_c = context.input_calib
-        poses = []
+        poses = [ np.eye(4) ]
         points3d = None
         
         for i in range(1, len(keypoints)):
@@ -45,24 +46,34 @@ class SFMStage(Stage):
             if points3d is None:
                 points3d = points3d_i
 
+            ax_ba = plot_3dpoints(
+                refs=[],
+                points=[points3d_i],
+                ref_labels=[],
+                point_labels=["Initial triangulation"])
+            
+            ax_ba.set_title("Points and poses after refinement")
+            plt.show()
+
             poses.append(pose)
-        
-        return poses, points3d
+
+        # refinement via BA
+        return BA_optimize(points3d.T, poses, keypoints, context.input_calib)
 
 
     def run(self, input: _SFMInput, context : Pipeline) -> _SFMOutput:
-        imgs, target, keypoints = input
+        imgs, target, img_keypoints, target_keypoints = input
 
         # NOTE: 
         # All poses will be computed with respect to the first new camera,
         # that is, index 1 in keypoints/imgs array
 
         # triangulate points from new photos
-        poses, points3d = self.__pose_with_calib(keypoints[1:], context)
+        poses, points3d = self.__pose_with_calib(img_keypoints, context)
 
         # poses serve as parameters for BA refinement
         if super().has_callback():
-            super().get_callback()(imgs, target, keypoints, points3d, poses)
+            super().get_callback()(imgs, target, img_keypoints, points3d, poses)
 
         # points and old pose
         return points3d, None

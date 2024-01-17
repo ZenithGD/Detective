@@ -79,7 +79,7 @@ class CalibrationStage(Stage):
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             
             Logger.info(f"Undistorting image '{name}'")
-            undist_image = cv2.undistort(img, mtx, dist)
+            undist_image = cv2.undistort(gray, mtx, dist)
             cal_input_images.append(undist_image)
 
         # update context

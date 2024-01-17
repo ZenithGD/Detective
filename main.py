@@ -108,19 +108,20 @@ def get_properties(args):
     return cal_path, photo_path, target_path, match_thresh, common_thresh
     
 
-def matching_callback(image_tensors, target_tensor, keypoints):
+def matching_callback(image_tensors, target_tensor, image_keypoints, target_keypoints):
 
-    for i in range(1, len(keypoints)):
-        axes = viz2d.plot_images([target_tensor, image_tensors[i-1]])
+    for i in range(1, len(image_keypoints)):
+        axes = viz2d.plot_images([image_tensors[0], image_tensors[i-1]])
 
-        mkp0, mkp1 = keypoints[0], keypoints[i]
+        mkp0, mkp1 = image_keypoints[0], image_keypoints[i-1]
         viz2d.plot_matches(mkp0, mkp1, color="lime", lw=0.2)
         viz2d.add_text(0, f"{mkp0.shape[0]} common matches")
+        viz2d.save_plot(f"match0-{i}.png")
         plt.show()
 
 def sfm_callback(imgs, target, keypoints, points3d, poses):
     ax_ini = plot_3dpoints(
-        refs=[ np.linalg.inv(p) for p in poses],
+        refs=[ p for p in poses],
         points=[points3d],
         ref_labels=[ f"C{i + 1}" for i in range(len(poses))],
         point_labels=["Initial triangulation"])
@@ -128,46 +129,47 @@ def sfm_callback(imgs, target, keypoints, points3d, poses):
     ax_ini.set_title("Initial estimation")
     plt.show()
 
-    # find projection matrix of a camera
-    fig, ax = plt.subplots()
 
-    K_c = np.loadtxt("K_c.txt")
-    P = create_P(K_c, poses[0])
-    xi_proj = P @ points3d.T
-    xi_proj /= xi_proj[2]
-    
-    plot_image_residual(ax, imgs[1], keypoints[2].T, xi_proj[:2])
-    ax.set_title(f"residuals 0")
+    for i, p in enumerate(poses):
+        fig, ax = plt.subplots()
+        K_c = np.loadtxt("K_c.txt")
+        # find projection matrix of a camera
+        P = create_P(K_c, p)
+        xi_proj = P @ points3d.T
+        xi_proj /= xi_proj[2]
+        
+        plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
+        ax.set_title(f"residuals 0")
 
     plt.show()
 
-# def sfm_callback(imgs, target, keypoints, points3d, poses):
-#     ax_ini = plot_3dpoints(
-#         refs=[ np.linalg.inv(p) for p in poses],
-#         points=[points3d],
-#         ref_labels=[ f"C{i + 1}" for i in range(len(poses))],
-#         point_labels=["Initial triangulation"])
+def sfm_callback(imgs, target, keypoints, points3d, poses):
+    ax_ini = plot_3dpoints(
+        refs=poses,
+        points=[],
+        ref_labels=[ f"C{i}" for i in range(len(poses))],
+        point_labels=[])
     
-#     ax_ini.set_title("Initial estimation")
-#     plt.show()
+    ax_ini.set_title("Initial estimation")
+    plt.show()
 
-#     K_c = np.loadtxt("K_c.txt")
-#     for i, p in enumerate(poses):
-#         # pose i corresponds to camera i+1's pose with respect to camera 1
-        
-#         # find projection matrix of a camera
-#         P = create_P(K_c, p)
-#         xi_proj = P @ points3d.T
-#         xi_proj /= xi_proj[2]
-        
-#         fig, ax = plt.subplots()
-#         plot_image_residual(ax, imgs[i + 1], keypoints[i + 2].T, xi_proj[:2])
-#         ax.set_title(f"residuals {i + 1}")
+    K_c = np.loadtxt("K_c.txt")
+    for i, p in enumerate(poses):
+        # pose i corresponds to camera i+1's pose with respect to camera 1
 
-#     fig, ax = plt.subplots()
-#     ax.imshow(imgs[0])
-#     plotNumberedImagePoints(keypoints[1], 'g', (5,5))
-#     plt.show()
+        # find projection matrix of a camera
+        P = create_P(K_c, p)
+        xi_proj = P @ points3d
+        xi_proj /= xi_proj[2]
+        
+        fig, ax = plt.subplots()
+        plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
+        ax.set_title(f"residuals {i}")
+
+    fig, ax = plt.subplots()
+    ax.imshow(imgs[0])
+    plotNumberedImagePoints(keypoints[1], 'g', (5,5))
+    plt.show()
 
 def main(args):
     # setup logging
@@ -180,10 +182,10 @@ def main(args):
     dp = Pipeline([
         CalibrationStage(),
         MatchingStage(
-            callback=matching_callback, 
+            #callback=matching_callback, 
             match_thresh=match_thresh,
             common_thresh=common_thresh, 
-            extractor_type=ExtractorType.ALIKED),
+            extractor_type=ExtractorType.SUPERPOINT),
         SFMStage(
             callback=sfm_callback
         ),

@@ -83,16 +83,32 @@ class MatchingStage(Stage):
         common_ids : list = None
         match_list = []
         feats_list = []
-    
-        for i in range(len(tensor_imgs)):
+        
+        feats_image_0 = self.extractor.extract(tensor_imgs[0])
 
-            Logger.info(f"Matching target image to image {i}")
+        # match image 0 with target
+        Logger.info(f"Matching image 0 to target")
+        # matches from keypoints for target and image i
+            # match the features
+        matches01 = self.matcher({'image0': feats_image_0, 'image1': feats_target})
+        _, _, matches01 = [rbd(x) for x in [feats_image_0, feats_target, matches01]]  # remove batch dimension
+        matches = matches01['matches']  # indices with shape (K,2)
+
+        n_matches = matches.shape[0]
+        Logger.info(f"Found {n_matches} matches.")
+
+        # start with matches of the first new image with the target
+        common_ids = matches[:, 0].cpu().numpy()
+    
+        for i in range(1, len(tensor_imgs)):
+
+            Logger.info(f"Matching image 0 to image {i}")
             # matches from keypoints for target and image i
 
             feats_image_i = self.extractor.extract(tensor_imgs[i])
              # match the features
-            matches01 = self.matcher({'image0': feats_target, 'image1': feats_image_i})
-            _, _, matches01 = [rbd(x) for x in [feats_target, feats_image_i, matches01]]  # remove batch dimension
+            matches01 = self.matcher({'image0': feats_image_0, 'image1': feats_image_i})
+            _, _, matches01 = [rbd(x) for x in [feats_image_0, feats_image_i, matches01]]  # remove batch dimension
             matches = matches01['matches']  # indices with shape (K,2)
 
             n_matches = matches.shape[0]
@@ -100,10 +116,7 @@ class MatchingStage(Stage):
 
             if n_matches >= self.match_thresh:
 
-                if common_ids is None:
-                    tmp_common_ids = matches[:, 0].cpu().numpy()
-                else:
-                    tmp_common_ids = list(filter(lambda x : x in common_ids, matches[:, 0].cpu().numpy()))
+                tmp_common_ids = list(filter(lambda x : x in common_ids, matches[:, 0].cpu().numpy()))
                 
                 if len(tmp_common_ids) >= self.common_thresh:
                     sel.append(i)
@@ -125,7 +138,7 @@ class MatchingStage(Stage):
         tensor_imgs_sel = [ tensor_imgs[i] for i in sel ]
         # translate matches into keypoint pairs
         kp_target = feats_target['keypoints'].cpu().numpy().squeeze()
-        all_keypoints = [ kp_target[np.array(common_ids)] ]
+        all_keypoints = [  ]
 
         for i, mp in enumerate(match_list):
             kp_i = feats_list[i]['keypoints'].cpu().numpy().squeeze()
@@ -134,14 +147,14 @@ class MatchingStage(Stage):
 
         # set selection for the future
         self.selection = sel
-        return tensor_imgs_sel, target_tensor, all_keypoints
+        return tensor_imgs_sel, target_tensor, all_keypoints, kp_target
           
     def run(self, input: _MSInput, context : Pipeline) -> _MSOutput:
         cal_input_images, target_image = input
 
-        tensor_images, target_tensor, keypoints = self.__match(cal_input_images, target_image, context)
+        tensor_images, target_tensor, img_keypoints, target_keypoints = self.__match(cal_input_images, target_image, context)
 
         if super().has_callback():
-            super().get_callback()(tensor_images, target_tensor, keypoints)
+            super().get_callback()(tensor_images, target_tensor, img_keypoints, target_keypoints)
 
-        return [ cal_input_images[i] for i in self.selection ], target_image, keypoints
+        return [ cal_input_images[i] for i in self.selection ], target_image, img_keypoints, target_keypoints

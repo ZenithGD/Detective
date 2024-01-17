@@ -103,3 +103,15 @@ def create_F_GT(T, K0, K1):
 
 def essential_from_F(F, K0, K1):
     return K0.T @ F @ K1
+
+def crossMatrixInv(M):
+    x = np.array([M[2, 1], M[0, 2], M[1, 0]], dtype=np.float64)
+    return x
+    
+def crossMatrix(x):
+    M = np.array([
+        [  0.0, -x[2],  x[1]],
+        [ x[2],   0.0, -x[0]],
+        [-x[1],  x[0],   0.0]
+    ], dtype=float)
+    return M

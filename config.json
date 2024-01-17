@@ -2,6 +2,6 @@
     "calibration": "./resources/calibration",
     "photos": "./resources/photos",
     "target": "./resources/target.jpg",
-    "match_threshold": 50,
-    "common_threshold": 60
+    "match_threshold": 150,
+    "common_threshold": 70
 }
