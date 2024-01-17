@@ -21,7 +21,7 @@ class SFMStage(Stage):
         self.full_ba = full_ba
 
     def __repr__(self):
-        return f"SFMStage : (Photos, Target, points) -> (3d, pose)"
+        return f"SFMStage : (images, target, image points, target points) -> (3d, pose)"
     
     def __pose_with_calib(self, keypoints : np.array, context : Pipeline):
         """Computes for each camera from 2 to n the relative pose with respect to camera 1.
@@ -46,19 +46,14 @@ class SFMStage(Stage):
             if points3d is None:
                 points3d = points3d_i
 
-            ax_ba = plot_3dpoints(
-                refs=[],
-                points=[points3d_i],
-                ref_labels=[],
-                point_labels=["Initial triangulation"])
-            
-            ax_ba.set_title("Points and poses after refinement")
-            plt.show()
-
             poses.append(pose)
 
-        # refinement via BA
-        return BA_optimize(points3d.T, poses, keypoints, context.input_calib)
+        if self.full_ba:
+            # refinement via BA
+            return BA_optimize(points3d.T, poses, keypoints, context.input_calib)
+        
+        else:
+            return poses, points3d
 
 
     def run(self, input: _SFMInput, context : Pipeline) -> _SFMOutput:
@@ -71,9 +66,20 @@ class SFMStage(Stage):
         # triangulate points from new photos
         poses, points3d = self.__pose_with_calib(img_keypoints, context)
 
+        # pose for old camera
+        K_old, T_old, P = DLT_pose(points3d, target_keypoints)
+
+        # find projection matrix of a camera
+        xi_proj = P @ points3d.T
+        xi_proj /= xi_proj[2]
+        
+        fig, ax = plt.subplots()
+        plot_image_residual(ax, context.target, target_keypoints.T, xi_proj[:2])
+        ax.set_title(f"residuals old camera")
+
         # poses serve as parameters for BA refinement
         if super().has_callback():
-            super().get_callback()(imgs, target, img_keypoints, points3d, poses)
+            super().get_callback()(imgs, target, img_keypoints, points3d, poses, T_old)
 
         # points and old pose
-        return points3d, None
+        return points3d, T_old, img_keypoints, target_keypoints

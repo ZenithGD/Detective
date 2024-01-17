@@ -80,7 +80,7 @@ def drawRefSystem(ax, T_w_c, strStyle, nameStr):
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 0:1], strStyle, 'r', 1)
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 1:2], strStyle, 'g', 1)
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 2:3], strStyle, 'b', 1)
-    ax.text(np.squeeze( T_w_c[0, 3]+0.1), np.squeeze( T_w_c[1, 3]+0.1), np.squeeze( T_w_c[2, 3]+0.1), nameStr)
+    ax.text(np.squeeze( T_w_c[0, 3]+np.random.uniform(-0.2, 0.2)), np.squeeze( T_w_c[1, 3]+np.random.uniform(-0.2, 0.2)), np.squeeze( T_w_c[2, 3]+np.random.uniform(-0.2, 0.2)), nameStr)
 
 
 

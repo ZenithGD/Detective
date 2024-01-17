@@ -50,9 +50,6 @@ def create_F_from_matches(matches1 : np.array, matches2 : np.array):
     U, S, V = np.linalg.svd(F)
     return U @ np.diag(np.array([S[0], S[1], 0])) @ V
 
-def DLT_projection(matches1, matches2):
-    pass
-
 def create_tri_eq(P, point2d):
     mat00 = P[2][0] * point2d[0] - P[0][0]
     mat01 = P[2][1] * point2d[0] - P[0][1]

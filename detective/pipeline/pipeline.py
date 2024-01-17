@@ -59,7 +59,7 @@ class Pipeline:
         # load images
         cal_images = read_images(cal_path)
         photo_images = read_images(photo_path)
-        target_image = read_image(target_path)
+        target_image = cv2.cvtColor(read_image(target_path),cv2.COLOR_BGR2GRAY)
 
         current = (cal_images, photo_images, target_image)
 

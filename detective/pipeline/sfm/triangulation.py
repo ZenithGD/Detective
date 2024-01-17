@@ -1,7 +1,10 @@
+from detective.logger import Logger
 from detective.utils.plot import *
 from detective.utils.spatial import *
 import scipy as sc
 import scipy.optimize as scOptim
+
+import cv2
 
 from itertools import chain
 
@@ -160,9 +163,6 @@ def BA_optimize(points3d, poses, keypoints, K_c):
 
     vec3d = points3d[:3].flatten()
 
-    print(vec3d.shape)
-    for k in keypoints:
-        print(k.shape)
     pose_tup = [ pose_from_T(np.linalg.inv(pose)) for pose in poses ]
     pose_list = []
     for R, t in pose_tup:
@@ -171,11 +171,11 @@ def BA_optimize(points3d, poses, keypoints, K_c):
 
     # first solution [X3D1, X3D2, ..., X3DnPoints,tx, ty, tz, theta_x, theta_y, theta_z]
     Op = np.concatenate([ vec3d ] + pose_list).astype(float)
-    print()
+
     npoints = points3d.shape[1]
     ncams = len(poses)
 
-    print(f"Multiview BA ({ncams} views) for {npoints} points")
+    Logger.info(f"Multiview BA ({ncams} views) for {npoints} points")
 
     # Optimization with L2 norm and Levenberg-Marquardt
     OpOptim = scOptim.least_squares(
@@ -198,8 +198,42 @@ def BA_optimize(points3d, poses, keypoints, K_c):
 
     ax_ba = plot_3dpoints(
         refs=transf, 
-        points=[points3d, p3d_ba.T],
+        points=[points3d.T, p3d_ba.T],
         ref_labels=[ f"C{i}" for i in range(len(poses))],
-        point_labels=["Ground truth", "Initial triangulation", "BA optimized"])
+        point_labels=["Initial triangulation", "BA optimized"])
     
-    return transf, points3d
+    plt.show()
+    
+    return transf, p3d_ba.T
+
+def DLT_eq(point3d, point2d):
+
+    X, Y, Z, W = point3d
+    x, y = point2d
+
+    return np.array([
+        [-X, -Y, -Z, -W,  0,  0,  0,  0, x * X, x * Y, x * Z, x * W],
+        [ 0,  0,  0,  0, -X, -Y, -Z, -W, y * X, y * Y, y * Z, y * W]
+    ])
+
+def DLT_pose(points3d, kp_old):
+
+    # create equations
+    DLT_eq_mat = np.concatenate(
+        [ DLT_eq(points3d[i], kp_old[i]) for i in range(points3d.shape[0]) ], 
+        axis = 0)
+    
+    U, S, V = np.linalg.svd(DLT_eq_mat)
+    P = V[-1].reshape(3, 4)
+
+    # decompose matrix
+    M = P[:, :3]
+    P_signed = P * np.sign(np.linalg.det(M))
+
+    out = cv2.decomposeProjectionMatrix(P_signed)
+    K, R, t = out[0], out[1], out[2]
+
+    R = np.linalg.inv(R)
+    t = np.linalg.inv(P[:3, :3]) @ P[:3, 3]
+    t = t.ravel() / t[-1]
+    return K, create_T(R, t[:3]), P

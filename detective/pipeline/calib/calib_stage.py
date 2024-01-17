@@ -97,8 +97,8 @@ class CalibrationStage(Stage):
 
         cal_input_images = self.__calibrate(cal_images, input_images, context)
 
-        self.images = cal_input_images
-        self.target = target_image
+        context.images = [ image.copy() for image in cal_input_images ]
+        context.target = target_image.copy()
 
         if super().has_callback():
             super().get_callback()(cal_input_images)
