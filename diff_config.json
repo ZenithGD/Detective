@@ -4,5 +4,5 @@
     "target": "./resources/target.jpg",
     "extractor": "SUPERPOINT",
     "match_threshold": 150,
-    "common_threshold": 100
+    "common_threshold": 50
 }

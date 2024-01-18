@@ -139,7 +139,7 @@ def matching_callback(image_tensors, target_tensor, image_keypoints, target_keyp
     viz2d.save_plot(f"match0-target.png")
     plt.show()
 
-def sfm_callback(imgs, target, keypoints, points3d, poses, old_pose):
+def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, old_pose, old_proj):
     ax_ini = plot_3dpoints(
         refs=poses + [ old_pose ],
         points=[points3d],
@@ -161,15 +161,20 @@ def sfm_callback(imgs, target, keypoints, points3d, poses, old_pose):
         fig, ax = plt.subplots()
         plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
         ax.set_title(f"residuals {i}")
+
+        rmse = np.sqrt(np.sum(np.square(keypoints[i].T - xi_proj[:2])))
+        Logger.info(f"RMSE of residuals for camera {i} = {rmse}")
     
     # find projection matrix of a camera
-    P = create_P(K_c, p)
-    xi_proj = P @ points3d.T
+    xi_proj = old_proj @ points3d.T
     xi_proj /= xi_proj[2]
     
     fig, ax = plt.subplots()
-    plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
-    ax.set_title(f"residuals {i}")
+    plot_image_residual(ax, target, target_keypoints.T, xi_proj[:2])
+    ax.set_title(f"residuals target")
+    rmse = np.sqrt(np.sum(np.square(keypoints[i].T - xi_proj[:2])))
+    Logger.info(f"RMSE of residuals for target camera = {rmse}")
+    
     plt.show()
 
 def main(args):
@@ -188,7 +193,7 @@ def main(args):
             common_thresh=common_thresh, 
             extractor_type=extractor),
         SFMStage(
-            full_ba=True,
+            full_ba=False,
             callback=sfm_callback
         ),
     ])

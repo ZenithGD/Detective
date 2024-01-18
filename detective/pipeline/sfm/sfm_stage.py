@@ -69,17 +69,9 @@ class SFMStage(Stage):
         # pose for old camera
         K_old, T_old, P = DLT_pose(points3d, target_keypoints)
 
-        # find projection matrix of a camera
-        xi_proj = P @ points3d.T
-        xi_proj /= xi_proj[2]
-        
-        fig, ax = plt.subplots()
-        plot_image_residual(ax, context.target, target_keypoints.T, xi_proj[:2])
-        ax.set_title(f"residuals old camera")
-
         # poses serve as parameters for BA refinement
         if super().has_callback():
-            super().get_callback()(imgs, target, img_keypoints, points3d, poses, T_old)
+            super().get_callback()(imgs, target, img_keypoints, target_keypoints, points3d, poses, T_old, P)
 
         # points and old pose
         return points3d, T_old, img_keypoints, target_keypoints
