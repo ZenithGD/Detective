@@ -1,6 +1,7 @@
-# CV assignmnent
+# Detective
 
 Detective: A tool for inferring camera pose and changes in the scene from a set of pictures
+For Computer Vision assignment, MRGCV Zaragoza
 
 ## Installation
 
