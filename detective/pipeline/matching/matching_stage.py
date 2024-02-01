@@ -54,7 +54,7 @@ class MatchingStage(Stage):
                 fst = 'superpoint'
 
         # matcher is always lightglue
-        self.matcher = LightGlue(features=fst).eval().cuda()  # load the matcher
+        self.matcher = LightGlue(features=fst, depth_confidence=-1, width_confidence=-1).eval().cuda()  # load the matcher
 
     def __repr__(self):
         return f"MatchingStage : (Photos, Target) -> (images, target, image points, target points) "

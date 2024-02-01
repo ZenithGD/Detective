@@ -8,7 +8,7 @@ from lightglue import viz2d
 import matplotlib.pyplot as plt
 
 from detective.logger import Logger, ANSIFormatter
-from detective.pipeline import Pipeline, CalibrationStage, SFMStage, MatchingStage, DiffStage
+from detective.pipeline import Pipeline, CalibrationStage, SFMStage, FullMatchingStage, DiffStage
 from detective.pipeline.matching import ExtractorType
 from detective.utils.plot import *
 from detective.utils.spatial import *
@@ -120,20 +120,25 @@ def get_properties(args):
     return cal_path, photo_path, target_path, match_thresh, common_thresh, extractor
     
 
-def matching_callback(image_tensors, target_tensor, image_keypoints, target_keypoints):
+def matching_callback(tensor_images, tensor_target, kp_imgs, kp_target, matches_imgs, matches_target):
 
-    for i in range(1, len(image_keypoints)):
-        axes = viz2d.plot_images([image_tensors[0], image_tensors[i-1]])
+    for i in range(1, len(kp_imgs)):
+        axes = viz2d.plot_images([tensor_images[0], tensor_images[i]])
 
-        mkp0, mkp1 = image_keypoints[0], image_keypoints[i-1]
+        mkp0, mkp1 = kp_imgs[0], kp_imgs[i]
+        mkp0 = mkp0[matches_imgs[i-1][..., 0]]
+        mkp1 = mkp1[matches_imgs[i-1][..., 1]]
+
         viz2d.plot_matches(mkp0, mkp1, color="lime", lw=0.2)
         viz2d.add_text(0, f"{mkp0.shape[0]} common matches")
         viz2d.save_plot(f"match0-{i}.png")
         plt.show()
 
-    axes = viz2d.plot_images([image_tensors[0], target_tensor])
+    axes = viz2d.plot_images([tensor_images[0], tensor_target])
 
-    mkp0, mkp1 = image_keypoints[0], target_keypoints
+    mkp0, mkp1 = kp_imgs[0], kp_target
+    mkp0 = mkp0[matches_target[..., 0]]
+    mkp1 = mkp1[matches_target[..., 1]]
     viz2d.plot_matches(mkp0, mkp1, color="lime", lw=0.2)
     viz2d.add_text(0, f"{mkp0.shape[0]} common matches")
     viz2d.save_plot(f"match0-target.png")
@@ -149,6 +154,10 @@ def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, old
     ax_ini.set_title("Initial estimation")
     plt.show()
 
+    np.savetxt("points3d.txt", points3d)
+    for i, p in enumerate(poses):
+        np.savetxt(f"pose-{i}.txt", p)
+
     K_c = np.loadtxt("K_c.txt")
     for i, p in enumerate(poses):
         # pose i corresponds to camera i+1's pose with respect to camera 1
@@ -161,19 +170,21 @@ def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, old
         fig, ax = plt.subplots()
         plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
         ax.set_title(f"residuals {i}")
-
-        rmse = np.sqrt(np.sum(np.square(keypoints[i].T - xi_proj[:2])))
+        
+        dists = np.linalg.norm(keypoints[i].T - xi_proj[:2], axis=0)
+        rmse = np.sqrt(np.mean(np.square(dists)))
         Logger.info(f"RMSE of residuals for camera {i} = {rmse}")
     
-    # find projection matrix of a camera
-    xi_proj = old_proj @ points3d.T
-    xi_proj /= xi_proj[2]
+    # # find projection matrix of a camera
+    # xi_proj = old_proj @ points3d.T
+    # xi_proj /= xi_proj[2]
     
-    fig, ax = plt.subplots()
-    plot_image_residual(ax, target, target_keypoints.T, xi_proj[:2])
-    ax.set_title(f"residuals target")
-    rmse = np.sqrt(np.sum(np.square(keypoints[i].T - xi_proj[:2])))
-    Logger.info(f"RMSE of residuals for target camera = {rmse}")
+    # fig, ax = plt.subplots()
+    # plot_image_residual(ax, target, target_keypoints.T, xi_proj[:2])
+    # ax.set_title(f"residuals target")
+    # dists = np.norm(target_keypoints.T - xi_proj[:2], axis=0)
+    # rmse = np.sqrt(np.mean(np.square(dists)))
+    # Logger.info(f"RMSE of residuals for target camera = {rmse}")
     
     plt.show()
 
@@ -187,7 +198,7 @@ def main(args):
     # run pipeline
     dp = Pipeline([
         CalibrationStage(),
-        MatchingStage(
+        FullMatchingStage(
             callback=matching_callback, 
             match_thresh=match_thresh,
             common_thresh=common_thresh, 

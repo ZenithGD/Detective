@@ -181,7 +181,7 @@ def BA_optimize(points3d, poses, keypoints, K_c):
     OpOptim = scOptim.least_squares(
         resBundleProjection, Op, 
         args=([ kp.T for kp in keypoints ], K_c, npoints, ncams), 
-        method='trf', jac='3-point', loss='huber',
+        method='trf', jac='2-point', loss='huber',
         verbose=2)
 
     print("Plotting 3d BA-refined reconstruction")
