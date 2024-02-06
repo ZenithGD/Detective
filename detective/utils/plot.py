@@ -117,9 +117,6 @@ def plot_image_residual(ax, img, x_gt, x_est):
     """
     ax.imshow(img)
 
-    print(x_est.shape)
-    print(x_gt.shape)
-
     for i in range(x_gt.shape[1]):
         ax.plot([x_gt[0][i], x_est[0][i]], [x_gt[1][i], x_est[1][i]], 'b-')
     

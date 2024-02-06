@@ -3,6 +3,8 @@ from lightglue.utils import numpy_image_to_torch, rbd
 from lightglue import viz2d
 from lightglue import match_pair
 
+import sys
+
 import matplotlib.pyplot as plt
 
 from detective.utils.images import read_image
@@ -16,8 +18,8 @@ extractor = DISK(max_num_keypoints=2048).eval().cuda()  # load the extractor
 matcher = LightGlue(features='disk').eval().cuda()  # load the matcher
 
 # load each image as a torch.Tensor on GPU with shape (3,H,W), normalized in [0,1]
-image0 = numpy_image_to_torch(read_image('resources/photos/20231103_132254.jpg')).cuda()
-image1 = numpy_image_to_torch(read_image('resources/target.jpg')).cuda()
+image0 = numpy_image_to_torch(read_image(sys.argv[1])).cuda()
+image1 = numpy_image_to_torch(read_image(sys.argv[2])).cuda()
 # extract local features
 feats0 = extractor.extract(image0)  # auto-resize the image, disable with resize=None
 feats1 = extractor.extract(image1)

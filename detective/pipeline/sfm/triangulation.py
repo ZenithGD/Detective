@@ -152,6 +152,30 @@ def resBundleProjection(Op, data, K_c, nPoints, nCams):
 
     return np.concatenate(res)
 
+def resBundlePoseRefinement(Op, K_c, points3d, kp):
+    """Residuals for refining pose of old camera
+
+    Args:
+        Op (np.array): Optimization parameters. Specifically it contains
+        a parametrization for the projection matrix of the old camera.
+        points3d (np.array): The 3d points visible from the old camera. 
+        kp (np.array): The keypoints corresponding to the points in 3d
+    """
+    t = Op[3:]
+    R = sc.linalg.expm(crossMatrix(Op[:3]))
+    T = create_T(R, t)
+    P = create_P(K_c, T)
+    xi_proj = P @ points3d.T
+    xi_proj /= xi_proj[2]
+    # fig, ax = plt.subplots()
+    # plot_image_residual(ax, cv2.imread("resources/target.jpg"), kp.T, xi_proj[:2])
+    # ax.set_title(f"residuals target")
+    # plt.show()
+    print(xi_proj[:2].flatten() - kp.flatten())
+
+    return xi_proj[:2].flatten() - kp.flatten()
+    
+
 def BA_optimize(points3d, poses, keypoints, K_c):
     """Optimize points in 3d and poses with multiview BA.
 
@@ -177,7 +201,6 @@ def BA_optimize(points3d, poses, keypoints, K_c):
 
     Logger.info(f"Multiview BA ({ncams} views) for {npoints} points")
 
-    # Optimization with L2 norm and Levenberg-Marquardt
     OpOptim = scOptim.least_squares(
         resBundleProjection, Op, 
         args=([ kp.T for kp in keypoints ], K_c, npoints, ncams), 
@@ -216,6 +239,23 @@ def DLT_eq(point3d, point2d):
         [ 0,  0,  0,  0, -X, -Y, -Z, -W, y * X, y * Y, y * Z, y * W]
     ])
 
+def decomposeP(P):
+    M = P[:, :3]
+    out = cv2.decomposeProjectionMatrix(np.sign(np.linalg.det(M)) * P)
+    K, R, t = out[0], out[1], out[2].ravel()
+
+    K /= K[2][2]
+    R = np.linalg.inv(R)
+    t = t[:3] / t[3]
+
+    Tinv = create_T(R, t)
+    T = np.linalg.inv(Tinv)
+
+    t = T[0:3,3]
+    R = T[0:3, 0:3]
+
+    return K, R, t, P
+
 def DLT_pose(points3d, kp_old):
 
     # create equations
@@ -227,13 +267,30 @@ def DLT_pose(points3d, kp_old):
     P = V[-1].reshape(3, 4)
 
     # decompose matrix
-    M = P[:, :3]
-    P_signed = P * np.sign(np.linalg.det(M))
+    return decomposeP(P)
 
-    out = cv2.decomposeProjectionMatrix(P_signed)
-    K, R, t = out[0], out[1], out[2]
+def refine_pose(points3d, kp, K_c, R, t, P):
 
-    R = np.linalg.inv(R)
-    t = np.linalg.inv(P[:3, :3]) @ P[:3, 3]
-    t = t.ravel() / t[-1]
-    return K, create_T(R, t[:3]), P
+    P = create_P(K_c, create_T(R, t))
+
+    xi_proj = P @ points3d.T
+    xi_proj /= xi_proj[2]
+    fig, ax = plt.subplots()
+    plot_image_residual(ax, cv2.imread("resources/target.jpg"), kp.T, xi_proj[:2])
+    ax.set_title(f"residuals target")
+    plt.show()
+
+    rvec = crossMatrixInv(sc.linalg.logm(R))
+    Op = np.concatenate([rvec, t])
+    # Optimization with L2 norm and Levenberg-Marquardt
+    OpOptim = scOptim.least_squares(
+        resBundlePoseRefinement, Op, 
+        args=(K_c, points3d, kp), 
+        method='trf', jac='2-point', loss='huber',
+        verbose=2)
+    
+    t_ba = OpOptim.x[3:]
+    rvec_ba = OpOptim.x[:3]
+    R_ba = sc.linalg.expm(crossMatrix(rvec_ba))
+    T = create_T(R_ba, t_ba)
+    return K_c, T, create_P(K_c, T)

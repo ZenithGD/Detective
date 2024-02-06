@@ -12,6 +12,7 @@ from detective.pipeline import Pipeline, CalibrationStage, SFMStage, FullMatchin
 from detective.pipeline.matching import ExtractorType
 from detective.utils.plot import *
 from detective.utils.spatial import *
+from detective.utils.images import *
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Detective: A tool for inferring camera pose and changes in the scene from a set of pictures")
@@ -118,87 +119,25 @@ def get_properties(args):
     Logger.info(f"Common threshold: {common_thresh}")
 
     return cal_path, photo_path, target_path, match_thresh, common_thresh, extractor
+
+def load_data(subf : str):
     
+    # get points
+    points3d_img = np.loadtxt(f"results/{subf}/points3d.txt")
+    points3d_target = np.loadtxt(f"results/{subf}/points3d_target.txt")
 
-def matching_callback(tensor_images, tensor_target, kp_imgs, kp_target, matches_imgs, matches_target):
+    # poses
+    pose_img = [
+        np.loadtxt(f"results/{subf}/pose-0.txt"),
+        np.loadtxt(f"results/{subf}/pose-1.txt"),
+        np.loadtxt(f"results/{subf}/pose-2.txt")
+    ]
 
-    for i in range(1, len(kp_imgs)):
-        axes = viz2d.plot_images([tensor_images[0], tensor_images[i]])
+    pose_target = np.loadtxt(f"results/{subf}/pose-target.txt")
 
-        mkp0, mkp1 = kp_imgs[0], kp_imgs[i]
-        mkp0 = mkp0[matches_imgs[i-1][..., 0]]
-        mkp1 = mkp1[matches_imgs[i-1][..., 1]]
+    P_old = np.loadtxt(f"results/{subf}/P-old.txt")
 
-        viz2d.plot_matches(mkp0, mkp1, color="lime", lw=0.2)
-        viz2d.add_text(0, f"{mkp0.shape[0]} common matches")
-        viz2d.save_plot(f"match0-{i}.png")
-        plt.show()
-
-    axes = viz2d.plot_images([tensor_images[0], tensor_target])
-
-    mkp0, mkp1 = kp_imgs[0], kp_target
-    mkp0 = mkp0[matches_target[..., 0]]
-    mkp1 = mkp1[matches_target[..., 1]]
-    viz2d.plot_matches(mkp0, mkp1, color="lime", lw=0.2)
-    viz2d.add_text(0, f"{mkp0.shape[0]} common matches")
-    viz2d.save_plot(f"match0-target.png")
-    plt.show()
-
-def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, mask_target, old_pose, old_proj):
-    
-    parr = [ np.linalg.inv(p) for p in poses ] + [ np.linalg.inv(old_pose) ]
-    ax_ini = plot_3dpoints(
-        refs=parr,
-        points=[points3d],
-        ref_labels=[ f"C{i}" for i in range(len(poses))] + [ "old" ],
-        point_labels=["3d sparse reconstruction"])
-    
-    ax_ini.set_title("Initial estimation")
-    plt.show()
-
-    np.savetxt("results/points3d.txt", points3d)
-    np.savetxt("results/points3d_target.txt", points3d[mask_target])
-    for i, p in enumerate(poses):
-        np.savetxt(f"results/pose-{i}.txt", p)
-
-    for i, kp in enumerate(keypoints):
-        np.savetxt(f"results/kp-{i}.txt", kp)
-
-    np.savetxt("results/pose-target.txt", old_pose)
-    np.savetxt("results/kp-target.txt", target_keypoints)
-
-    K_c = np.loadtxt("K_c.txt")
-    for i, p in enumerate(poses):
-        # pose i corresponds to camera i+1's pose with respect to camera 1
-
-        # find projection matrix of a camera
-        P = create_P(K_c, p)
-        xi_proj = P @ points3d.T
-        xi_proj /= xi_proj[2]
-        
-        fig, ax = plt.subplots()
-        plot_image_residual(ax, imgs[i], keypoints[i].T, xi_proj[:2])
-        ax.set_title(f"residuals {i}")
-        
-        dists = np.linalg.norm(keypoints[i].T - xi_proj[:2], axis=0)
-        rmse = np.sqrt(np.mean(np.square(dists)))
-        Logger.info(f"RMSE of residuals for camera {i} = {rmse}")
-    
-    # # find projection matrix of a camera
-    pm = points3d[mask_target]
-    xi_proj = old_proj @ pm.T
-    xi_proj /= xi_proj[2]
-
-    np.savetxt("results/P_old.txt", old_proj)
-    
-    fig, ax = plt.subplots()
-    plot_image_residual(ax, target, target_keypoints.T, xi_proj[:2])
-    ax.set_title(f"residuals target")
-    dists = np.linalg.norm(target_keypoints.T - xi_proj[:2], axis=0)
-    rmse = np.sqrt(np.mean(np.square(dists)))
-    Logger.info(f"RMSE of residuals for target camera = {rmse}")
-    
-    plt.show()
+    return points3d_img, points3d_target, pose_img, pose_target, P_old
 
 def main(args):
     # setup logging
@@ -207,30 +146,68 @@ def main(args):
     # get all properties
     cal_path, photo_path, target_path, match_thresh, common_thresh, extractor = get_properties(args) 
 
-    # run pipeline
+    # read images
     dp = Pipeline([
-        CalibrationStage(),
-        FullMatchingStage(
-            #callback=matching_callback, 
-            match_thresh=match_thresh,
-            common_thresh=common_thresh, 
-            extractor_type=extractor),
-        SFMStage(
-            full_ba=True,
-            refine_old=True,
-            callback=sfm_callback
-        ),
+        CalibrationStage()
     ])
-
-    print(dp)
-    
-    diffs = dp.run(
+    photo_images, target_image = dp.run(
         cal_path=cal_path,
         photo_path=photo_path,
         target_path=target_path,
     )
 
-if __name__ == "__main__":
+    # get subfolder data
+    p3d_img, p3d_target, poses, pose_target, P_old = load_data("tri")
+
+    # get keypoints
+    kp_img = [
+        np.loadtxt(f"results/kp-0.txt"),
+        np.loadtxt(f"results/kp-1.txt"),
+        np.loadtxt(f"results/kp-2.txt")
+    ]
+    kp_target = np.loadtxt(f"results/kp-target.txt")
+    K_c = np.loadtxt("K_c.txt")
+
+    parr = [ np.linalg.inv(p) for p in poses ] + [ np.linalg.inv(pose_target) ]
+    ax_ini = plot_3dpoints(
+        refs=parr,
+        points=[p3d_img],
+        ref_labels=[ f"C{i}" for i in range(len(poses))] + [ "old" ],
+        point_labels=["3d sparse reconstruction"])
+    
+    ax_ini.set_title("Initial estimation")
+
+    for i, p in enumerate(poses):
+        # pose i corresponds to camera i+1's pose with respect to camera 1
+        print(photo_images[i].shape)
+        # find projection matrix of a camera
+        P = create_P(K_c, p)
+        xi_proj = P @ p3d_img.T
+        xi_proj /= xi_proj[2]
+        
+        fig, ax = plt.subplots()
+        plot_image_residual(ax, photo_images[i], kp_img[i].T, xi_proj[:2])
+        ax.set_title(f"residuals {i}")
+        
+        dists = np.linalg.norm(kp_img[i].T - xi_proj[:2], axis=0)
+        mde = np.mean(dists)
+        Logger.info(f"MDE of residuals for camera {i} = {mde} pixels")
+
+    # # find projection matrix of a camera
+    pm = p3d_target
+    xi_proj = P_old @ pm.T
+    xi_proj /= xi_proj[2]
+    
+    fig, ax = plt.subplots()
+    plot_image_residual(ax, target_image, kp_target.T, xi_proj[:2])
+    ax.set_title(f"residuals target")
+    dists = np.linalg.norm(kp_target.T - xi_proj[:2], axis=0)
+    mde = np.mean(dists)
+    Logger.info(f"MDE of residuals for camera {i} = {mde} pixels")
+    
+    plt.show()
+
+if __name__ == '__main__':
     args = parse_arguments()
 
     main(args)

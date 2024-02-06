@@ -44,6 +44,7 @@ class Pipeline:
         self.images = None
         self.target = None
         self.selection = None
+        self.reuse_result = True
 
     def __repr__(self) -> str:
 

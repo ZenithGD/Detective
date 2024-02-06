@@ -17,10 +17,11 @@ _SFMOutput : TypeAlias = Tuple[np.array, np.array]
 
 class SFMStage(Stage):
     
-    def __init__(self, callback = None, full_ba : bool = True):
+    def __init__(self, callback = None, full_ba : bool = True, refine_old : bool = True):
         # Initialize parent class
         super().__init__(callback)
         self.full_ba = full_ba
+        self.refine_old = refine_old
 
     def __repr__(self):
         return f"SFMStage : (images, target, image points, target points) -> (3d, pose)"
@@ -32,6 +33,12 @@ class SFMStage(Stage):
         Args:
             keypoints (np.array): _description_
         """
+        if context.reuse_result:
+            poses = [ np.loadtxt(f"results/ba/pose-{i}.txt") for i in range(len(keypoints)) ]
+            points3d = np.loadtxt(f"results/ba/points3d.txt")
+
+            return poses, points3d
+
         K_c = context.input_calib
         poses = [ np.eye(4) ]
 
@@ -83,6 +90,16 @@ class SFMStage(Stage):
         else:
             return poses, points3d
 
+    def __old_camera_pose(self, points3d, kp):
+        
+        K, R, t, P = DLT_pose(points3d, kp)
+
+        if self.refine_old:
+            # refine pose and return
+            return refine_pose(points3d, kp, K, R, t, P)
+        else:
+            return K, create_T(R, t), P
+
 
     def run(self, input: _SFMInput, context : Pipeline) -> _SFMOutput:
         kp_imgs, kp_target, matches_imgs, matches_target = input
@@ -100,24 +117,36 @@ class SFMStage(Stage):
             ))
             print(common_ids)
 
+        common_target_ids = common_ids.copy()
+        common_target_ids = set(filter(
+            lambda x : x in common_target_ids, matches_target[:, 0]
+        ))
+
         # find common matches between new cameras and compute 3d and pose
         matches_common_new = [ np.array(list(filter(lambda x: x[0] in common_ids, m))) for m in matches_imgs ]
 
+        # mask for values common with old photo
+        mask_target = np.isin(matches_common_new[0][:, 0], np.array(list(common_target_ids)))
+        
         kp_0 = kp_imgs[0][list(common_ids)]
         kp_common_new = [ kp_0 ]
         for i, mp in enumerate(matches_common_new):
             points1 = kp_imgs[i+1][mp[..., 1]]
             kp_common_new.append(points1)
 
+        print(kp_common_new[0].shape)
+        matches_common_target = np.array(list(filter(lambda x: x[0] in common_target_ids, matches_target)))
+        kp_common_target = kp_target[matches_common_target[..., 1]]
+
         # triangulate points from new photos
-        poses, points3d = self.__pose_with_calib(kp_common_new, len(common_ids), context)
+        poses, points3d = self.__pose_with_calib(kp_common_new, len(kp_common_new[0]), context)
 
         # pose for old camera
-        K_old, T_old, P = DLT_pose(points3d, kp_target)
+        K_old, T_old, P = self.__old_camera_pose(points3d[mask_target], kp_common_target)
 
         # poses serve as parameters for BA refinement
         if super().has_callback():
-            super().get_callback()(context.images, context.target, kp_common_new, kp_target, points3d, poses, T_old, P)
+            super().get_callback()(context.images, context.target, kp_common_new, kp_common_target, points3d, poses, mask_target, T_old, P)
 
         # points and old pose
         return points3d, T_old, kp_imgs, kp_target
