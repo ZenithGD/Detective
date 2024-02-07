@@ -95,6 +95,7 @@ def plot_3dpoints(refs, points, ref_labels, point_labels):
     for i, ref in enumerate(refs):
         drawRefSystem(ax, ref, '-', ref_labels[i])
     
+    ptps = np.concatenate(points, axis=0)
     for i, pt in enumerate(points):
         ax.scatter(pt[:, 0], pt[:, 1], pt[:, 2], marker='.', label=point_labels[i])
     
@@ -105,7 +106,9 @@ def plot_3dpoints(refs, points, ref_labels, point_labels):
     yFakeBoundingBox = np.linspace(0, 4, 2)
     zFakeBoundingBox = np.linspace(0, 4, 2)
     plt.plot(xFakeBoundingBox, yFakeBoundingBox, zFakeBoundingBox, 'w.')
-    ax.set_box_aspect((1, 1, 1))
+    ax.set_xlim3d([-5, 5])
+    ax.set_ylim3d([-5, 5])
+    ax.set_zlim3d([-2, 10])
     return ax
 
 def plot_image_residual(ax, img, x_gt, x_est):

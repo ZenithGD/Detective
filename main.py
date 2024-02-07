@@ -144,7 +144,7 @@ def matching_callback(tensor_images, tensor_target, kp_imgs, kp_target, matches_
     viz2d.save_plot(f"match0-target.png")
     plt.show()
 
-def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, mask_target, old_pose, old_proj):
+def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, p3d_target, old_pose, old_proj):
     
     parr = [ np.linalg.inv(p) for p in poses ] + [ np.linalg.inv(old_pose) ]
     ax_ini = plot_3dpoints(
@@ -157,7 +157,7 @@ def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, mas
     plt.show()
 
     np.savetxt("results/points3d.txt", points3d)
-    np.savetxt("results/points3d_target.txt", points3d[mask_target])
+    np.savetxt("results/points3d_target.txt", p3d_target)
     for i, p in enumerate(poses):
         np.savetxt(f"results/pose-{i}.txt", p)
 
@@ -183,15 +183,19 @@ def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, mas
         dists = np.linalg.norm(keypoints[i].T - xi_proj[:2], axis=0)
         rmse = np.sqrt(np.mean(np.square(dists)))
         Logger.info(f"RMSE of residuals for camera {i} = {rmse}")
-    
+    plt.show()
     # # find projection matrix of a camera
-    pm = points3d[mask_target]
+    pm = p3d_target
     xi_proj = old_proj @ pm.T
     xi_proj /= xi_proj[2]
 
-    np.savetxt("results/P_old.txt", old_proj)
+    np.savetxt("results/P-old.txt", old_proj)
+
+    print(xi_proj.shape, target_keypoints.shape)
     
     fig, ax = plt.subplots()
+    print(xi_proj.shape)
+    print(target_keypoints.shape)
     plot_image_residual(ax, target, target_keypoints.T, xi_proj[:2])
     ax.set_title(f"residuals target")
     dists = np.linalg.norm(target_keypoints.T - xi_proj[:2], axis=0)
@@ -216,7 +220,7 @@ def main(args):
             common_thresh=common_thresh, 
             extractor_type=extractor),
         SFMStage(
-            full_ba=True,
+            full_ba=False,
             refine_old=False,
             callback=sfm_callback
         ),

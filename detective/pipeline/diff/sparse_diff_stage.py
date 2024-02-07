@@ -21,11 +21,11 @@ class SparseDiffStage(Stage):
         # extract SIFT descriptors for comparison
         sift = cv2.SIFT_create()
 
-        kp_new_cv = [cv2.KeyPoint(x[0], x[1], 32) for x in kp_new]
-        kp_old_cv = [cv2.KeyPoint(x[0], x[1], 32) for x in kp_old]
+        kp_new_cv = [cv2.KeyPoint(x[0], x[1], 64) for x in kp_new]
+        kp_old_cv = [cv2.KeyPoint(x[0], x[1], 64) for x in kp_old]
 
         _, ds_new = sift.compute(context.images[0], kp_new_cv)
-        _, ds_old = sift.compute(context.images[0], kp_old_cv)
+        _, ds_old = sift.compute(context.target, kp_old_cv)
 
         # # FLANN parameters
         FLANN_INDEX_KDTREE = 1
@@ -43,7 +43,7 @@ class SparseDiffStage(Stage):
                         singlePointColor = (255,0,0),
                         matchesMask = matchesMask,
                         flags = cv2.DrawMatchesFlags_DEFAULT)
-        img3 = cv2.drawMatchesKnn(context.images[0],kp_new_cv,context.images[0],kp_old_cv,matches,None,**draw_params)
+        img3 = cv2.drawMatchesKnn(context.images[0],kp_new_cv,context.target,kp_old_cv,matches,None,**draw_params)
         plt.imshow(img3)
         plt.show()
         return None

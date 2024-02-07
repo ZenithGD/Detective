@@ -171,9 +171,9 @@ def main(args):
     parr = [ np.linalg.inv(p) for p in poses ] + [ np.linalg.inv(pose_target) ]
     ax_ini = plot_3dpoints(
         refs=parr,
-        points=[p3d_img],
+        points=[p3d_img, p3d_target],
         ref_labels=[ f"C{i}" for i in range(len(poses))] + [ "old" ],
-        point_labels=["3d sparse reconstruction"])
+        point_labels=["3d sparse reconstruction", "target 3d"])
     
     ax_ini.set_title("Sparse reconstruction")
     
@@ -193,6 +193,8 @@ def main(args):
         dists = np.linalg.norm(kp_img[i].T - xi_proj[:2], axis=0)
         mde = np.mean(dists)
         Logger.info(f"MDE of residuals for camera {i} = {mde} pixels")
+    
+    plt.show()
 
     # # find projection matrix of a camera
     pm = p3d_target
@@ -215,7 +217,6 @@ def main(args):
     kpt_proj /= kpt_proj[2]
     ax.plot(kp0[0], kp0[1],'rx', markersize=10, label="Keypoints in new image")
     ax.plot(kp0_proj[0], kp0_proj[1],'gx', markersize=10, label="Projected all")
-    ax.plot(kpt_proj[0], kpt_proj[1],'bx', markersize=10, label="Projected target")
     ax.legend()
     
     plt.show()
