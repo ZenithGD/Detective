@@ -8,7 +8,7 @@ from lightglue import viz2d
 import matplotlib.pyplot as plt
 
 from detective.logger import Logger, ANSIFormatter
-from detective.pipeline import Pipeline, CalibrationStage, SFMStage, FullMatchingStage, DiffStage
+from detective.pipeline import Pipeline, CalibrationStage, SFMStage, FullMatchingStage, SparseDiffStage, DiffStage
 from detective.pipeline.matching import ExtractorType
 from detective.utils.plot import *
 from detective.utils.spatial import *
@@ -217,9 +217,10 @@ def main(args):
             extractor_type=extractor),
         SFMStage(
             full_ba=True,
-            refine_old=True,
+            refine_old=False,
             callback=sfm_callback
         ),
+        SparseDiffStage()
     ])
 
     print(dp)

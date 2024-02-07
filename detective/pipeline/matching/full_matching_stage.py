@@ -108,6 +108,10 @@ class FullMatchingStage(Stage):
     def run(self, input: _MSInput, context : Pipeline) -> _MSOutput:
         cal_input_images, target_image = input
 
+        # set reference to matcher
+        context.extractor = self.extractor
+        context.matcher = self.matcher
+
         tensor_images, tensor_target, kp_imgs, kp_target, matches_imgs, matches_target = self.__match(cal_input_images, target_image, context)
 
         if super().has_callback():

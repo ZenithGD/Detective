@@ -144,9 +144,23 @@ class SFMStage(Stage):
         # pose for old camera
         K_old, T_old, P = self.__old_camera_pose(points3d[mask_target], kp_common_target)
 
+        # project old set of points into new image space (cam 0)
+        P0 = create_P(context.input_calib, poses[0])
+
+        fig, ax = plt.subplots()
+        ax.imshow(context.images[0])
+        kp0 = kp_common_new[0].T
+        kpt_proj = P0 @ points3d[mask_target].T
+        kpt_proj /= kpt_proj[2]
+        ax.plot(kp0[0], kp0[1],'rx', markersize=10, label="New image keypoints")
+        ax.plot(kpt_proj[0], kpt_proj[1],'gx', markersize=10, label="Old image points projected into new")
+        ax.legend()
+    
+        plt.show()
+
         # poses serve as parameters for BA refinement
         if super().has_callback():
             super().get_callback()(context.images, context.target, kp_common_new, kp_common_target, points3d, poses, mask_target, T_old, P)
 
-        # points and old pose
-        return points3d, T_old, kp_imgs, kp_target
+        # next stage should be sparse on a pair of images
+        return kp_common_new[0], kpt_proj.T

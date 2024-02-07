@@ -34,6 +34,8 @@ class Pipeline:
         self.__stages : List[Stage] = stages
 
         # context
+        self.extractor = None
+        self.matcher = None
 
         # image calibration matrix
         self.input_calib = None

@@ -80,7 +80,7 @@ def drawRefSystem(ax, T_w_c, strStyle, nameStr):
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 0:1], strStyle, 'r', 1)
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 1:2], strStyle, 'g', 1)
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 2:3], strStyle, 'b', 1)
-    ax.text(np.squeeze( T_w_c[0, 3]+np.random.uniform(-0.2, 0.2)), np.squeeze( T_w_c[1, 3]+np.random.uniform(-0.2, 0.2)), np.squeeze( T_w_c[2, 3]+np.random.uniform(-0.2, 0.2)), nameStr)
+    ax.text(np.squeeze( T_w_c[0, 3] +0.2), np.squeeze( T_w_c[1, 3] +0.2), np.squeeze( T_w_c[2, 3] +0.2), nameStr)
 
 
 
@@ -105,7 +105,7 @@ def plot_3dpoints(refs, points, ref_labels, point_labels):
     yFakeBoundingBox = np.linspace(0, 4, 2)
     zFakeBoundingBox = np.linspace(0, 4, 2)
     plt.plot(xFakeBoundingBox, yFakeBoundingBox, zFakeBoundingBox, 'w.')
-
+    ax.set_box_aspect((1, 1, 1))
     return ax
 
 def plot_image_residual(ax, img, x_gt, x_est):
