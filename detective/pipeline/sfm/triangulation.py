@@ -152,7 +152,7 @@ def resBundleProjection(Op, data, K_c, nPoints, nCams):
 
     return np.concatenate(res)
 
-def resBundlePoseRefinement(Op, K_c, points3d, kp):
+def resBundlePoseRefinement(Op, points3d, kp):
     """Residuals for refining pose of old camera
 
     Args:
@@ -161,17 +161,13 @@ def resBundlePoseRefinement(Op, K_c, points3d, kp):
         points3d (np.array): The 3d points visible from the old camera. 
         kp (np.array): The keypoints corresponding to the points in 3d
     """
-    t = Op[3:]
-    R = sc.linalg.expm(crossMatrix(Op[:3]))
-    T = create_T(R, t)
-    P = create_P(K_c, T)
+    P = Op.reshape(3, 4)
     xi_proj = P @ points3d.T
     xi_proj /= xi_proj[2]
     # fig, ax = plt.subplots()
     # plot_image_residual(ax, cv2.imread("resources/target.jpg"), kp.T, xi_proj[:2])
     # ax.set_title(f"residuals target")
     # plt.show()
-    print(xi_proj[:2].flatten() - kp.flatten())
 
     return xi_proj[:2].flatten() - kp.flatten()
     
@@ -281,16 +277,13 @@ def refine_pose(points3d, kp, K_c, R, t, P):
     plt.show()
 
     rvec = crossMatrixInv(sc.linalg.logm(R))
-    Op = np.concatenate([rvec, t])
+    Op = P.flatten()
     # Optimization with L2 norm and Levenberg-Marquardt
     OpOptim = scOptim.least_squares(
         resBundlePoseRefinement, Op, 
-        args=(K_c, points3d, kp), 
+        args=(points3d, kp), 
         method='trf', jac='2-point', loss='huber',
         verbose=2)
     
-    t_ba = OpOptim.x[3:]
-    rvec_ba = OpOptim.x[:3]
-    R_ba = sc.linalg.expm(crossMatrix(rvec_ba))
-    T = create_T(R_ba, t_ba)
-    return K_c, T, create_P(K_c, T)
+    P = OpOptim.x.reshape(3, 4)
+    return decomposeP(P)

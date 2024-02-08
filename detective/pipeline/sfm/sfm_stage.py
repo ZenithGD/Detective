@@ -117,11 +117,16 @@ class SFMStage(Stage):
         
         K, R, t, P = DLT_pose(points3d, kp)
 
+        print(P)
+
         if self.refine_old:
             # refine pose and return
-            return refine_pose(points3d, kp, K, R, t, P)
+            K, R, t, P_opt = refine_pose(points3d, kp, K, R, t, P)
+            print(P / P[2, 3])
+            print(P_opt / P_opt[2, 3])
+            return K, R, t, P_opt
         else:
-            return K, create_T(R, t), P
+            return K, R, t, P
 
 
     def run(self, input: _SFMInput, context : Pipeline) -> _SFMOutput:
@@ -176,9 +181,9 @@ class SFMStage(Stage):
         print(points3d_old_m)
         kp_common_target_m = kp_common_target[pmask]
 
-        K_old, T_old, P = self.__old_camera_pose(points3d_old, kp_common_target)
-
-        kpt_proj = P @ points3d_old_m.T
+        K_old, R_old, t_old, P = self.__old_camera_pose(points3d_old, kp_common_target)
+        T_old = create_T(R_old, t_old)
+        kpt_proj = P @ points3d.T
         kpt_proj /= kpt_proj[2]
 
         # poses serve as parameters for BA refinement
@@ -187,4 +192,4 @@ class SFMStage(Stage):
             super().get_callback()(context.images, context.target, kpcn, kp_common_target_m, points3d, poses, points3d_old_m, T_old, P)
 
         # next stage should be sparse on a pair of images
-        return kp_common_new[0], kpt_proj.T
+        return kp_common_target, kpt_proj.T
