@@ -183,7 +183,7 @@ def sfm_callback(imgs, target, keypoints, target_keypoints, points3d, poses, p3d
         dists = np.linalg.norm(keypoints[i].T - xi_proj[:2], axis=0)
         rmse = np.sqrt(np.mean(np.square(dists)))
         Logger.info(f"RMSE of residuals for camera {i} = {rmse}")
-    plt.show()
+
     # # find projection matrix of a camera
     pm = p3d_target
     xi_proj = old_proj @ pm.T

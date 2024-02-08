@@ -101,11 +101,16 @@ class SFMStage(Stage):
         if self.full_ba:
             # refinement via BA
             kps = [ kp[mask] for kp in keypoints ]
-            points3d_all = points3d.copy()
+            points3d_all = np.zeros_like(points3d)
+            points3d_all[:, 3] = 1
             poses, points3d = BA_optimize(points3d[mask].T, poses, kps, context.input_calib)
+            points3d_all[mask] = points3d
             return poses, points3d, points3d_all, mask
         else:
-            points3d_all = points3d.copy()
+            
+            points3d_all = np.zeros_like(points3d)
+            points3d_all[:, 3] = 1
+            points3d_all[mask] = points3d[mask].copy()
             return poses, points3d[mask], points3d_all, mask
 
     def __old_camera_pose(self, points3d, kp):
@@ -128,7 +133,6 @@ class SFMStage(Stage):
 
         # obtain set of common points of all *new* cameras
         common_ids = set(matches_imgs[0][:, 0])
-        print(common_ids)
         for i in range(1, len(matches_imgs)):
             common_ids = set(filter(
                 lambda x : x in common_ids, matches_imgs[i][:, 0]
@@ -137,7 +141,7 @@ class SFMStage(Stage):
         # find common matches between new cameras and compute 3d and pose
         matches_common_new = [ np.array(list(filter(lambda x: x[0] in common_ids, m))) for m in matches_imgs ]
 
-        kp_0 = kp_imgs[0][list(common_ids)]
+        kp_0 = kp_imgs[0][matches_common_new[0][..., 0]]
         kp_common_new = [ kp_0 ]
         for i, mp in enumerate(matches_common_new):
             points1 = kp_imgs[i+1][mp[..., 1]]
@@ -152,30 +156,35 @@ class SFMStage(Stage):
         ))
         
         # # find ids of masked keypoints
-        # mask_ids = matches_common_new[0][mask, 0]
-        # common_target_ids = set(filter(
-        #     lambda x : x in common_target_ids, mask_ids
-        # ))
-
         # mask for values common with old photo
         mask_target = np.isin(matches_common_new[0][..., 0], np.array(list(common_target_ids)))
-
+        
         print(len(common_target_ids))
 
         matches_common_target = np.array(list(filter(lambda x: x[0] in common_target_ids, matches_target)))
         kp_common_target = kp_target[matches_common_target[..., 1]]
+
+        print(kp_common_target.shape)
         
         # pose for old camera
         points3d_old = points3d_all[mask_target]
+        print(points3d_old)
+        pmask = points3d_old[:, 0] != 0
+        print(pmask)
+
+        points3d_old_m = points3d_old[pmask]
+        print(points3d_old_m)
+        kp_common_target_m = kp_common_target[pmask]
+
         K_old, T_old, P = self.__old_camera_pose(points3d_old, kp_common_target)
 
-        kpt_proj = P @ points3d_old.T
+        kpt_proj = P @ points3d_old_m.T
         kpt_proj /= kpt_proj[2]
 
         # poses serve as parameters for BA refinement
         if super().has_callback():
             kpcn = [ kp[mask] for kp in kp_common_new ]
-            super().get_callback()(context.images, context.target, kpcn, kp_common_target, points3d, poses, points3d_old, T_old, P)
+            super().get_callback()(context.images, context.target, kpcn, kp_common_target_m, points3d, poses, points3d_old_m, T_old, P)
 
         # next stage should be sparse on a pair of images
         return kp_common_new[0], kpt_proj.T
