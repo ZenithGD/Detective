@@ -8,7 +8,7 @@ from lightglue import viz2d
 import matplotlib.pyplot as plt
 
 from detective.logger import Logger, ANSIFormatter
-from detective.pipeline import Pipeline, CalibrationStage, SFMStage, FullMatchingStage, DiffStage
+from detective.pipeline import Pipeline, CalibrationStage, SFMStage, SparseDiffStage,  FullMatchingStage, DiffStage
 from detective.pipeline.matching import ExtractorType
 from detective.utils.plot import *
 from detective.utils.spatial import *
@@ -171,9 +171,9 @@ def main(args):
     parr = [ np.linalg.inv(p) for p in poses ] + [ np.linalg.inv(pose_target) ]
     ax_ini = plot_3dpoints(
         refs=parr,
-        points=[p3d_img, p3d_target],
+        points=[p3d_img],
         ref_labels=[ f"C{i}" for i in range(len(poses))] + [ "old" ],
-        point_labels=["3d sparse reconstruction", "target 3d"])
+        point_labels=["3d sparse reconstruction"])
     
     ax_ini.set_title("Sparse reconstruction")
     
@@ -191,8 +191,8 @@ def main(args):
         ax.set_title(f"residuals {i}")
         
         dists = np.linalg.norm(kp_img[i].T - xi_proj[:2], axis=0)
-        mde = np.mean(dists)
-        Logger.info(f"MDE of residuals for camera {i} = {mde} pixels")
+        rmse = np.sqrt(np.mean(np.square(dists)))
+        Logger.info(f"RMSE of residuals for camera {i} = {rmse} pixels")
     
     plt.show()
 
@@ -205,21 +205,26 @@ def main(args):
     plot_image_residual(ax, target_image, kp_target.T, xi_proj[:2])
     ax.set_title(f"residuals target")
     dists = np.linalg.norm(kp_target.T - xi_proj[:2], axis=0)
-    mde = np.mean(dists)
-    Logger.info(f"MDE of residuals for camera {i} = {mde} pixels")
+    rmse = np.sqrt(np.mean(np.square(dists)))
+    Logger.info(f"RMSE of residuals for camera {i} = {rmse} pixels")
 
-    fig, ax = plt.subplots()
-    ax.imshow(target_image)
-    kp0 = kp_target.T
     kp0_proj = P_old @ p3d_img.T
     kp0_proj /= kp0_proj[2]
     kpt_proj = P_old @ p3d_target.T
     kpt_proj /= kpt_proj[2]
-    ax.plot(kp0[0], kp0[1],'rx', markersize=10, label="Keypoints in new image")
-    ax.plot(kp0_proj[0], kp0_proj[1],'gx', markersize=10, label="Projected all")
-    ax.legend()
+
+    # run pipeline
+    dp = Pipeline([
+        CalibrationStage()
+    ])
+    diffs = dp.run(
+        cal_path=cal_path,
+        photo_path=photo_path,
+        target_path=target_path,
+    )
     
-    plt.show()
+    sps = SparseDiffStage()
+    sps.run((kpt_proj.T, kp0_proj.T), dp)
 
 if __name__ == '__main__':
     args = parse_arguments()

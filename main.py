@@ -215,7 +215,7 @@ def main(args):
     dp = Pipeline([
         CalibrationStage(),
         FullMatchingStage(
-            #callback=matching_callback, 
+            callback=matching_callback, 
             match_thresh=match_thresh,
             common_thresh=common_thresh, 
             extractor_type=extractor),

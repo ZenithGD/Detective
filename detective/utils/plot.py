@@ -79,13 +79,13 @@ def drawRefSystem(ax, T_w_c, strStyle, nameStr):
     """
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 0:1], strStyle, 'r', 1)
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 1:2], strStyle, 'g', 1)
-    draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 2:3], strStyle, 'b', 1)
+    draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] - T_w_c[0:3, 2:3], strStyle, 'b', 1)
     ax.text(np.squeeze( T_w_c[0, 3] +0.2), np.squeeze( T_w_c[1, 3] +0.2), np.squeeze( T_w_c[2, 3] +0.2), nameStr)
 
 
 
 def plot_3dpoints(refs, points, ref_labels, point_labels):
-    plt.figure()
+    plt.figure(figsize=(8,5))
     ax = plt.axes(projection='3d', adjustable='box')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -97,7 +97,7 @@ def plot_3dpoints(refs, points, ref_labels, point_labels):
     
     ptps = np.concatenate(points, axis=0)
     for i, pt in enumerate(points):
-        ax.scatter(pt[:, 0], pt[:, 1], pt[:, 2], marker='.', label=point_labels[i])
+        ax.scatter(pt[:, 0], pt[:, 2], -pt[:, 1], marker='.', label=point_labels[i])
     
     ax.legend()
 
@@ -105,10 +105,15 @@ def plot_3dpoints(refs, points, ref_labels, point_labels):
     xFakeBoundingBox = np.linspace(0, 4, 2)
     yFakeBoundingBox = np.linspace(0, 4, 2)
     zFakeBoundingBox = np.linspace(0, 4, 2)
-    plt.plot(xFakeBoundingBox, yFakeBoundingBox, zFakeBoundingBox, 'w.')
-    ax.set_xlim3d([-5, 5])
-    ax.set_ylim3d([-5, 5])
-    ax.set_zlim3d([-2, 10])
+    plt.plot(xFakeBoundingBox, zFakeBoundingBox, yFakeBoundingBox, 'w.')
+    ax.set_xlim3d([-20, 5])
+    ax.set_zlim3d([-5, 5])
+    ax.set_ylim3d([-2, 30])
+    ax.set_aspect('equal')
+    
+    ax.set_xlabel('$X$')
+    ax.set_ylabel('$Z$')
+    ax.set_zlabel('$Y$')
     return ax
 
 def plot_image_residual(ax, img, x_gt, x_est):

@@ -164,21 +164,15 @@ class SFMStage(Stage):
         # mask for values common with old photo
         mask_target = np.isin(matches_common_new[0][..., 0], np.array(list(common_target_ids)))
         
-        print(len(common_target_ids))
-
         matches_common_target = np.array(list(filter(lambda x: x[0] in common_target_ids, matches_target)))
         kp_common_target = kp_target[matches_common_target[..., 1]]
 
-        print(kp_common_target.shape)
         
         # pose for old camera
         points3d_old = points3d_all[mask_target]
-        print(points3d_old)
         pmask = points3d_old[:, 0] != 0
-        print(pmask)
 
         points3d_old_m = points3d_old[pmask]
-        print(points3d_old_m)
         kp_common_target_m = kp_common_target[pmask]
 
         K_old, R_old, t_old, P = self.__old_camera_pose(points3d_old, kp_common_target)
@@ -192,4 +186,4 @@ class SFMStage(Stage):
             super().get_callback()(context.images, context.target, kpcn, kp_common_target_m, points3d, poses, points3d_old_m, T_old, P)
 
         # next stage should be sparse on a pair of images
-        return kp_common_target, kpt_proj.T
+        return kp_common_target, kpt_proj[:2].T
