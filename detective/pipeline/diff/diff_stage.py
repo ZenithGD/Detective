@@ -44,9 +44,9 @@ class DiffStage(Stage):
             colours = np.array([[0, 0, 0], [0, 255, 0], [255, 0, 0]])
             
             fig, ax = plt.subplots(1, 3)
-            ax[0].set_title("warped original otsu binarization")
+            ax[0].set_title("target otsu binarization")
             ax[0].imshow(thresh_old,cmap='hot')
-            ax[1].set_title("target otsu binarization")
+            ax[1].set_title("warped old otsu binarization")
             ax[1].imshow(thresh_new,cmap='hot')
             ax[2].set_title("difference")
             ax[2].imshow(colours[seg_labels],cmap='hot')
